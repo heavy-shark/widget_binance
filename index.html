@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Binance PnL</title>
+<style>
+  :root { --bg:#0f1115; --fg:#e6e8eb; --mute:#8a919c; --up:#2ebd85; --down:#f6465d; --line:#22262e; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.35 -apple-system, "SF Pro Text", system-ui, sans-serif; }
+  header { display:flex; justify-content:space-between; align-items:baseline; padding:10px 12px 6px; }
+  .total { font-size:20px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .meta { color:var(--mute); font-size:11px; }
+  table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+  th { color:var(--mute); font-weight:500; font-size:11px; text-align:right; padding:4px 12px; border-bottom:1px solid var(--line); }
+  td { text-align:right; padding:6px 12px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th:first-child, td:first-child { text-align:left; }
+  .sym { font-weight:600; }
+  .tag { font-size:10px; padding:1px 4px; border-radius:3px; margin-left:4px; }
+  .LONG { background:rgba(46,189,133,.15); color:var(--up); }
+  .SHORT { background:rgba(246,70,93,.15); color:var(--down); }
+  .up { color:var(--up); } .down { color:var(--down); }
+  .sub { color:var(--mute); font-size:11px; }
+  .err { color:var(--down); padding:8px 12px; font-size:12px; word-break:break-word; }
+  .empty { color:var(--mute); padding:16px 12px; }
+</style>
+</head>
+<body>
+<header>
+  <div><div class="meta">Unrealized PnL</div><div class="total" id="total">—</div></div>
+  <div class="meta" id="upd">…</div>
+</header>
+<div id="err" class="err" hidden></div>
+<table>
+  <thead><tr><th>Токен</th><th>Цена / вход</th><th>Размер</th><th>PnL</th></tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+<script>
+const fmtPrice = v => {
+  if (!v) return '—';
+  const d = v >= 1000 ? 2 : v >= 1 ? 4 : v >= 0.01 ? 5 : 8;
+  return v.toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});
+};
+const fmtUsd = v => (v >= 0 ? '+' : '') + v.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const fmtPct = v => v == null ? '' : (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+const cls = v => v >= 0 ? 'up' : 'down';
+
+async function tick() {
+  try {
+    const s = await (await fetch('/api', {cache: 'no-store'})).json();
+    const err = document.getElementById('err');
+    err.hidden = !s.error; err.textContent = s.error || '';
+
+    const ps = s.positions || [];
+    const total = ps.reduce((a, p) => a + p.upnl, 0);
+    const t = document.getElementById('total');
+    t.textContent = ps.length ? fmtUsd(total) + ' USDT' : '0.00';
+    t.className = 'total ' + (ps.length ? cls(total) : '');
+
+    document.getElementById('upd').textContent = s.updated
+      ? new Date(s.updated).toLocaleTimeString('ru-RU') + ' · ' + ps.length + ' поз.' : '…';
+
+    document.getElementById('rows').innerHTML = ps.length ? ps.map(p => `
+      <tr>
+        <td><span class="sym">${p.symbol.replace(/USDT$|USDC$/, '')}</span><span class="tag ${p.side}">${p.side}</span>
+            <div class="sub">liq ${fmtPrice(p.liq)}</div></td>
+        <td>${fmtPrice(p.mark)}<div class="sub">${fmtPrice(p.entry)} <span class="${cls(p.change)}">${fmtPct(p.change)}</span></div></td>
+        <td>${p.size}<div class="sub">$${Math.round(p.notional).toLocaleString('en-US')}</div></td>
+        <td class="${cls(p.upnl)}">${fmtUsd(p.upnl)}<div class="sub ${cls(p.upnl)}">${fmtPct(p.roe)}</div></td>
+      </tr>`).join('') : `<tr><td colspan="4" class="empty">Открытых позиций нет</td></tr>`;
+  } catch (e) {
+    const err = document.getElementById('err');
+    err.hidden = false; err.textContent = 'Сервер виджета недоступен';
+  }
+}
+tick();
+setInterval(tick, 3000);
+</script>
+</body>
+</html>
