@@ -1,5 +1,7 @@
 # widget_binance
 
+![Binance Futures PnL widget (демо-данные)](docs/preview.jpg)
+
 Виджет для рабочего стола macOS с открытыми позициями на Binance USDⓈ-M Futures. Он показывает токен, текущую цену, цену входа, нереализованный PnL и ROE и обновляется раз в 3 секунды.
 
 ```
